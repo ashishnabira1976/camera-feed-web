@@ -1,0 +1,3 @@
+# Optional: Install if you want Python to directly capture your laptop's webcam
+# without needing to open the /broadcast webpage in a browser.
+opencv-python>=4.8.0

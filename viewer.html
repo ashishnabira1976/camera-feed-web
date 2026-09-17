@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Live Camera Stream - Remote Viewer</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    .stream-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      transition: transform 0.3s ease;
+    }
+    .stream-img.mirrored {
+      transform: scaleX(-1);
+    }
+    .waiting-box {
+      position: absolute;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      color: var(--text-muted);
+      text-align: center;
+      padding: 24px;
+    }
+    .network-badge {
+      font-size: 0.75rem;
+      background: var(--bg-surface-elevated);
+      padding: 4px 8px;
+      border-radius: var(--radius-sm);
+      color: var(--text-secondary);
+      font-family: monospace;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <div class="logo-area">
+        <div class="camera-icon">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect>
+            <line x1="7" y1="2" x2="7" y2="22"></line>
+            <line x1="17" y1="2" x2="17" y2="22"></line>
+            <line x1="2" y1="12" x2="22" y2="12"></line>
+            <line x1="2" y1="7" x2="7" y2="7"></line>
+            <line x1="2" y1="17" x2="7" y2="17"></line>
+            <line x1="17" y1="17" x2="22" y2="17"></line>
+            <line x1="17" y1="7" x2="22" y2="7"></line>
+          </svg>
+        </div>
+        <div>
+          <h1>Remote Camera Viewer</h1>
+          <span class="network-badge" id="hostBadge">Connecting...</span>
+        </div>
+      </div>
+      <div id="statusBadge" class="status-badge idle">
+        <span class="status-dot"></span>
+        <span id="statusText">Connecting...</span>
+      </div>
+    </header>
+
+    <main class="main-content">
+      <!-- Live Video Viewport -->
+      <div class="video-wrapper">
+        <img id="streamImg" class="stream-img hidden" alt="Live Camera Feed">
+        <div id="waitingBox" class="waiting-box">
+          <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="6" x2="12" y2="12"></line>
+            <line x1="12" y1="12" x2="16" y2="14"></line>
+          </svg>
+          <p><strong>Waiting for camera stream...</strong></p>
+          <p style="font-size: 0.85rem; max-width: 360px;">
+            If you are broadcasting from this laptop, visit <a href="/broadcast" style="color: var(--accent);">/broadcast</a> to turn on the camera.
+          </p>
+        </div>
+        <div id="resolutionOverlay" class="resolution-overlay hidden">
+          <span id="fpsOverlay">0 FPS</span>
+        </div>
+      </div>
+
+      <!-- Controls -->
+      <div class="toolbar">
+        <div class="btn-group" style="width: 100%; justify-content: space-between;">
+          <div style="display: flex; gap: 10px;">
+            <button id="reconnectBtn" class="btn btn-primary">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="23 4 23 10 17 10"></polyline>
+                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+              </svg>
+              <span>Reload Stream</span>
+            </button>
+
+            <button id="mirrorBtn" class="btn btn-secondary" title="Mirror/Flip view">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="16 3 21 3 21 8"></polyline>
+                <line x1="4" y1="20" x2="21" y2="3"></line>
+                <polyline points="21 16 21 21 16 21"></polyline>
+                <line x1="15" y1="15" x2="21" y2="21"></line>
+                <polyline points="4 8 4 3 9 3"></polyline>
+                <line x1="9" y1="9" x2="4" y2="4"></line>
+              </svg>
+              <span>Mirror</span>
+            </button>
+
+            <a id="snapshotBtn" href="/snapshot" target="_blank" download="camera-snapshot.jpg" class="btn btn-secondary">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                <polyline points="21 15 16 10 5 21"></polyline>
+              </svg>
+              <span>Save Snapshot</span>
+            </a>
+          </div>
+
+          <div style="display: flex; gap: 10px;">
+            <button id="fullscreenBtn" class="btn btn-icon" title="Full screen">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
+              </svg>
+            </button>
+            <a href="/broadcast" class="btn btn-secondary" title="Switch to camera broadcaster">
+              <span>Go to Broadcaster ➜</span>
+            </a>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <footer class="footer">
+      <p>Streaming over local network • Works on laptops, phones, tablets, and smart TVs without installing any software.</p>
+    </footer>
+  </div>
+
+  <script>
+    const streamImg = document.getElementById('streamImg');
+    const waitingBox = document.getElementById('waitingBox');
+    const statusBadge = document.getElementById('statusBadge');
+    const statusText = document.getElementById('statusText');
+    const hostBadge = document.getElementById('hostBadge');
+    const reconnectBtn = document.getElementById('reconnectBtn');
+    const mirrorBtn = document.getElementById('mirrorBtn');
+    const fullscreenBtn = document.getElementById('fullscreenBtn');
+    const resolutionOverlay = document.getElementById('resolutionOverlay');
+    const fpsOverlay = document.getElementById('fpsOverlay');
+
+    let isMirrored = false;
+    hostBadge.textContent = window.location.host;
+
+    function reloadStream() {
+      // Add timestamp query parameter to bust browser cache
+      streamImg.src = '/stream?t=' + Date.now();
+      streamImg.classList.remove('hidden');
+      waitingBox.classList.add('hidden');
+    }
+
+    // Mirror Toggle
+    mirrorBtn.addEventListener('click', () => {
+      isMirrored = !isMirrored;
+      streamImg.classList.toggle('mirrored', isMirrored);
+    });
+
+    // Reconnect / Refresh stream
+    reconnectBtn.addEventListener('click', reloadStream);
+
+    // Fullscreen Toggle
+    fullscreenBtn.addEventListener('click', () => {
+      if (!document.fullscreenElement) {
+        streamImg.requestFullscreen().catch(console.error);
+      } else {
+        document.exitFullscreen();
+      }
+    });
+
+    // Periodic status poll
+    async function checkStatus() {
+      try {
+        const res = await fetch('/status');
+        const data = await res.json();
+
+        if (data.active) {
+          statusBadge.className = 'status-badge live';
+          statusText.textContent = `Live (${data.mode === 'opencv' ? 'Hardware' : 'Web'})`;
+          resolutionOverlay.classList.remove('hidden');
+          fpsOverlay.textContent = `${data.fps} FPS • ${data.viewers} viewer(s)`;
+
+          if (streamImg.classList.contains('hidden') || !streamImg.src) {
+            reloadStream();
+          }
+        } else {
+          statusBadge.className = 'status-badge idle';
+          statusText.textContent = 'Offline';
+          resolutionOverlay.classList.add('hidden');
+        }
+      } catch (err) {
+        statusBadge.className = 'status-badge error';
+        statusText.textContent = 'Disconnected';
+      }
+    }
+
+    // Initial load
+    reloadStream();
+    checkStatus();
+    setInterval(checkStatus, 1500);
+
+    // Handle stream load errors
+    streamImg.onerror = () => {
+      streamImg.classList.add('hidden');
+      waitingBox.classList.remove('hidden');
+    };
+    streamImg.onload = () => {
+      streamImg.classList.remove('hidden');
+      waitingBox.classList.add('hidden');
+    };
+  </script>
+</body>
+</html>
