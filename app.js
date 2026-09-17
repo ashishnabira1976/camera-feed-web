@@ -89,12 +89,23 @@ async function startCamera(deviceId = null) {
     audio: false
   };
 
-  if (deviceId) {
-    constraints.video.deviceId = { exact: deviceId };
+  if (typeof deviceId === 'string' && deviceId.trim()) {
+    constraints.video.deviceId = { ideal: deviceId };
   }
 
   try {
-    const stream = await navigator.mediaDevices.getUserMedia(constraints);
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia(constraints);
+    } catch (constraintErr) {
+      if (constraintErr.name === 'OverconstrainedError' || constraintErr.name === 'ConstraintNotSatisfiedError') {
+        console.warn('Overconstrained with requested settings, falling back to default video:', constraintErr);
+        stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      } else {
+        throw constraintErr;
+      }
+    }
+
     currentStream = stream;
     videoFeed.srcObject = stream;
     isStreaming = true;
