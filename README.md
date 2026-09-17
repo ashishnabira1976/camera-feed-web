@@ -58,3 +58,20 @@ python3 server.py --opencv
 - [broadcast.html](file:///usr/local/google/home/nabira/camera-feed-web/broadcast.html): Broadcaster page that captures webcam and pushes frames to `server.py`.
 - [index.html](file:///usr/local/google/home/nabira/camera-feed-web/index.html): Standalone single-machine camera viewer.
 - [style.css](file:///usr/local/google/home/nabira/camera-feed-web/style.css): Dark-mode stylesheet used across all pages.
+
+
+  ### Repository URL
+
+  https://github.com/ashishnabira1976/camera-feed-web
+  ──────
+  ### What's in the Repository
+
+  • index.html — Standalone single-machine camera feed viewer.
+  • style.css — Dark-mode stylesheet with responsive layout.
+  • app.js — WebRTC / MediaDevices camera handler with snapshot & mirror features.
+  • server.py — Python streaming server for multi-device Wi-Fi/LAN streaming.
+  • broadcast.html — Broadcaster interface to stream webcam frames from the source laptop.
+  • viewer.html — Remote viewer page for other laptops, phones, or tablets.
+  • requirements.txt — Optional dependencies for direct OpenCV hardware capture.
+  • README.md — Documentation with quick-start guides for both local viewing and network streaming.
+  
