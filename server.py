@@ -9,6 +9,7 @@ Supports two capture modes:
 """
 
 import argparse
+import base64
 import io
 import json
 import os
@@ -17,6 +18,8 @@ import sys
 import threading
 import time
 from http.server import HTTPServer, BaseHTTPRequestHandler, ThreadingHTTPServer
+
+AUTH_CREDENTIAL = None
 
 # Optional OpenCV support
 try:
@@ -105,7 +108,22 @@ class StreamingHandler(BaseHTTPRequestHandler):
             return
         sys.stderr.write(f"[{self.log_date_time_string()}] {msg}\n")
 
+    def check_auth(self):
+        if not AUTH_CREDENTIAL:
+            return True
+        auth_header = self.headers.get('Authorization', '')
+        if auth_header == f"Basic {AUTH_CREDENTIAL}":
+            return True
+        self.send_response(401)
+        self.send_header('WWW-Authenticate', 'Basic realm="Webcam Stream"')
+        self.send_header('Content-Type', 'text/html')
+        self.end_headers()
+        self.wfile.write(b"<h3>401 Unauthorized</h3><p>Valid username and password required.</p>")
+        return False
+
     def do_HEAD(self):
+        if not self.check_auth():
+            return
         path = self.path.split('?')[0]
         if path in ['/', '/index.html', '/viewer', '/broadcast', '/style.css', '/status']:
             self.send_response(200)
@@ -114,6 +132,8 @@ class StreamingHandler(BaseHTTPRequestHandler):
             self.send_error(404, 'Not Found')
 
     def do_GET(self):
+        if not self.check_auth():
+            return
         path = self.path.split('?')[0]
 
         # 1. Main Viewer Page
@@ -170,6 +190,8 @@ class StreamingHandler(BaseHTTPRequestHandler):
         self.send_error(404, 'Not Found')
 
     def do_POST(self):
+        if not self.check_auth():
+            return
         path = self.path.split('?')[0]
 
         # Ingestion endpoint for browser broadcaster
@@ -283,12 +305,18 @@ def opencv_capture_worker(device_index=0, width=1280, height=720, fps=30):
 
 
 def main():
+    global AUTH_CREDENTIAL
+
     parser = argparse.ArgumentParser(description="Python Webcam Streaming Server")
     parser.add_argument('--port', type=int, default=8080, help="Port to listen on (default: 8080)")
     parser.add_argument('--host', type=str, default='0.0.0.0', help="Host interface (default: 0.0.0.0)")
     parser.add_argument('--opencv', action='store_true', help="Force OpenCV direct hardware capture")
     parser.add_argument('--camera', type=int, default=0, help="OpenCV camera device index (default: 0)")
+    parser.add_argument('--auth', type=str, default=None, help="Require HTTP Basic Auth, e.g. --auth admin:secret123")
     args = parser.parse_args()
+
+    if args.auth:
+        AUTH_CREDENTIAL = base64.b64encode(args.auth.encode('utf-8')).decode('utf-8')
 
     local_ips = get_local_ips()
     primary_ip = local_ips[0]
@@ -318,6 +346,10 @@ def main():
     print("  PYTHON WEBCAM STREAMING SERVER")
     print("=" * 65)
     print(f" Mode: {mode_label}")
+    if args.auth:
+        print(f" Security: Password Protection ENABLED ({args.auth.split(':')[0]}:***)")
+    else:
+        print(" Security: Public (No password set. Use --auth user:pass for internet)")
     print()
     print(" [1] On THIS laptop (Camera Source):")
     if use_opencv and OPENCV_AVAILABLE:
